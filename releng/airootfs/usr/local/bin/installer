@@ -1,0 +1,76 @@
+#!/bin/bash
+
+dest_mount_dir="/mnt/dest"
+
+echo "ArchRDP 1.0 Installer Script"
+echo "Press Ctrl+C at any time to cancel installation."
+
+select_disk () {
+	prompt_disk () {
+		lsblk -do path,size,type,hotplug,model
+		disks=$(lsblk -lndo path)
+		read -p "Enter disk path: " disk_path
+	}
+	prompt_disk
+	while [[ $(echo ${disks[@]} | grep -w $disk_path) == "" ]]; do
+		echo "Invalid disk path."
+		prompt_disk
+	done
+}
+
+select_part () {
+	prompt_part () {
+		lsblk -o path,size,type $disk_path
+		parts=$(lsblk -lno path $disk_path)
+		read -p "Enter partition path: " part_path
+	}
+	prompt_part
+	while [[ $(echo ${parts[@]} | grep -w $part_path) == "" ]]; do
+		echo "Invalid partition path."
+		prompt_path
+	done
+}
+
+install_system () {
+	echo "Mounting partition $part_path at $dest_mount_dir..."
+	mkdir -p $dest_mount_dir
+	mount "$part_path" "$dest_mount_dir"
+	
+	echo "Mounting rootfs image at /mnt/rootfs..."
+	mkdir -p /mnt/rootfs
+	mount /run/archiso/bootmnt/rootfs.sfs /mnt/rootfs
+
+	echo "Copying system files..."
+	rsync -a --info=progress2 /mnt/rootfs/* $dest_mount_dir
+
+	echo "Building destination system from configuration..."
+	arch-chroot "$dest_mount_dir" <<-EOT
+	mkinitcpio -P
+	echo "Installing bootloader (GRUB)..."
+	grub-install --target=i386-pc "$disk_path"
+	grub-mkconfig -o /boot/grub/grub.cfg
+	EOT
+
+	echo "Unmounting $dest_mount_dir..."
+	umount -R $dest_mount_dir
+	echo "Unmounting /mnt/rootfs"
+	umount -R /mnt/rootfs
+
+	echo "Installation finished."
+}
+
+select_disk
+cfdisk $disk_path
+select_part
+echo "Selected partition $part_path."
+lsblk -l "$part_path"
+
+read -p "Do you want to confirm formatting the partition $part_path with ext4 filesystem? [yes/no]: " confirm_format
+if [ $confirm_format != "yes" ]; then
+	exit
+fi
+mkfs.ext4 $part_path
+
+install_system
+read -p "Press enter to reboot..." __reboot
+reboot

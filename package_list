@@ -1,0 +1,11 @@
+base
+linux
+linux-firmware
+dhcpcd
+iwd
+sudo
+nano
+grub
+freerdp
+xorg-server
+xorg-xinit

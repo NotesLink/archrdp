@@ -1,0 +1,19 @@
+#base system
+base
+linux
+linux-firmware
+
+#archiso stuff
+mkinitcpio-archiso
+arch-install-scripts
+
+#basic programs
+sudo
+nano
+pv
+rsync
+
+#bootloaders
+grub
+syslinux
+edk2-shell
